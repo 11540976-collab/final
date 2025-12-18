@@ -1,0 +1,5 @@
+{
+  "name": "SmartFinance AI",
+  "description": "A personal finance management system with Firebase authentication, Firestore database, and Gemini AI-powered financial advice.",
+  "requestFramePermissions": []
+}
