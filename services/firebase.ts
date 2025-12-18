@@ -5,17 +5,8 @@ import { getFirestore, type Firestore } from "firebase/firestore";
 // --- 設定說明 ---
 // 若您不希望使用 GitHub Secrets 管理 Firebase 設定，請直接將 Firebase Console 提供的設定物件
 // 填入下方的 `MANUAL_FIREBASE_CONFIG` 變數中。
-// 格式範例：
-// const MANUAL_FIREBASE_CONFIG = {
-//   apiKey: "AIzaSy...",
-//   authDomain: "...",
-//   projectId: "...",
-//   storageBucket: "...",
-//   messagingSenderId: "...",
-//   appId: "..."
-// };
 
-const firebaseConfig = {
+const MANUAL_FIREBASE_CONFIG = {
   apiKey: "AIzaSyDDbtwqxXogoyRmWXPsIVuWPaZMlA9fUyQ",
   authDomain: "final-cdb13.firebaseapp.com",
   projectId: "final-cdb13",
