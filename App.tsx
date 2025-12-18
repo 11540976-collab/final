@@ -14,12 +14,14 @@ import {
   PieChart, Pie, Cell, Tooltip as RechartsTooltip, Legend, ResponsiveContainer 
 } from 'recharts';
 import { 
-  Wallet, TrendingUp, TrendingDown, LogOut, Plus, Trash2, Edit2, BrainCircuit, CreditCard, DollarSign, Loader2, PlayCircle, Lock 
+  Wallet, TrendingUp, TrendingDown, LogOut, Plus, Trash2, Edit2, BrainCircuit, CreditCard, DollarSign, Loader2, PlayCircle, Lock,
+  Sun, Cloud, CloudRain, Snowflake, RefreshCw, Globe, MapPin, Wind
 } from 'lucide-react';
 
 import { auth, db, isFirebaseInitialized } from './services/firebase';
 import { getFinancialAdvice } from './services/geminiService';
-import { BankAccount, Transaction, Category, TransactionType } from './types';
+import { fetchWeather, fetchExchangeRates } from './services/externalServices';
+import { BankAccount, Transaction, Category, TransactionType, WeatherData, ExchangeRate } from './types';
 import { MOCK_ACCOUNTS, MOCK_TRANSACTIONS, DEFAULT_CATEGORIES } from './constants';
 
 // --- Utility Components ---
@@ -53,6 +55,26 @@ const Input: React.FC<React.InputHTMLAttributes<HTMLInputElement>> = (props) => 
   />
 );
 
+// --- Helper Functions ---
+
+const getWeatherIcon = (code: number) => {
+  // WMO Weather interpretation codes (WW)
+  if (code === 0) return <Sun className="w-10 h-10 text-amber-500" />;
+  if (code >= 1 && code <= 3) return <Cloud className="w-10 h-10 text-slate-400" />;
+  if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82)) return <CloudRain className="w-10 h-10 text-blue-500" />;
+  if (code >= 71 && code <= 77) return <Snowflake className="w-10 h-10 text-cyan-400" />;
+  return <Cloud className="w-10 h-10 text-slate-400" />;
+};
+
+const getWeatherDesc = (code: number) => {
+  if (code === 0) return "晴朗";
+  if (code >= 1 && code <= 3) return "多雲";
+  if (code >= 45 && code <= 48) return "有霧";
+  if (code >= 51 && code <= 67) return "有雨";
+  if (code >= 71) return "降雪";
+  return "陰天";
+};
+
 // --- Main App ---
 
 export default function App() {
@@ -60,7 +82,7 @@ export default function App() {
   const [appMode, setAppMode] = useState<'demo' | 'production'>(isFirebaseInitialized ? 'production' : 'demo');
 
   // Auth State
-  const [user, setUser] = useState<firebase.User | null>(null); // For Demo mode, we simulate a User object
+  const [user, setUser] = useState<firebase.User | null>(null);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -71,6 +93,10 @@ export default function App() {
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [categories] = useState<Category[]>(DEFAULT_CATEGORIES); 
+  
+  // External API State
+  const [weather, setWeather] = useState<WeatherData | null>(null);
+  const [rates, setRates] = useState<ExchangeRate[]>([]);
   
   // UI State
   const [activeTab, setActiveTab] = useState<'dashboard' | 'accounts' | 'transactions'>('dashboard');
@@ -96,7 +122,6 @@ export default function App() {
   // --- Initialization & Auth Effects ---
 
   useEffect(() => {
-    // If not initialized, force demo
     if (!isFirebaseInitialized) {
       setAppMode('demo');
     }
@@ -105,14 +130,9 @@ export default function App() {
   useEffect(() => {
     setIsLoading(true);
     if (appMode === 'demo') {
-      // Clean up previous user state if switching to demo but not "logged in" explicitly yet
-      // Actually, for demo, we might auto-login or wait for user to click "Enter Demo"
-      // Let's require a "Login" even for demo to mimic the flow, or just auto-set mock user if they choose demo.
-      // Current design: User selects mode at login screen.
       setUser(null);
       setIsLoading(false);
     } else {
-      // Production Mode
       if (!auth) {
          setIsLoading(false);
          return; 
@@ -125,6 +145,36 @@ export default function App() {
     }
   }, [appMode]);
 
+  // --- External API Effects ---
+  useEffect(() => {
+    // 1. Get Location & Weather
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          const { latitude, longitude } = position.coords;
+          const weatherData = await fetchWeather(latitude, longitude);
+          setWeather(weatherData);
+        },
+        (error) => {
+          console.warn("Geolocation permission denied or error:", error);
+          // Fallback to Taipei if permission denied
+          fetchWeather(25.0330, 121.5654).then(setWeather);
+        }
+      );
+    } else {
+       // Fallback to Taipei
+       fetchWeather(25.0330, 121.5654).then(setWeather);
+    }
+
+    // 2. Get Exchange Rates
+    const loadRates = async () => {
+      const data = await fetchExchangeRates();
+      setRates(data);
+    };
+    loadRates();
+
+  }, []);
+
   // --- Data Fetching Effects ---
 
   useEffect(() => {
@@ -135,13 +185,11 @@ export default function App() {
     }
 
     if (appMode === 'demo') {
-      // Load Mock Data
       setAccounts(MOCK_ACCOUNTS);
       setTransactions(MOCK_TRANSACTIONS);
       return;
     }
 
-    // Production Data Fetching
     if (!db) return;
 
     const qAccounts = query(collection(db, 'accounts'), where('uid', '==', user.uid));
@@ -169,7 +217,6 @@ export default function App() {
     setAuthError('');
     
     if (appMode === 'demo') {
-      // Demo Login: Accept anything
       setUser({ uid: 'demo-user', email: email || 'demo@example.com' } as any);
       return;
     }
@@ -199,7 +246,7 @@ export default function App() {
     }
   };
 
-  // --- Account Management ---
+  // --- CRUD Handlers ---
 
   const openAddAccount = () => {
     setEditingAccount(null);
@@ -220,18 +267,16 @@ export default function App() {
     const balanceNum = parseFloat(accountBalance);
 
     if (editingAccount) {
-      // Update
       if (appMode === 'demo') {
         setAccounts(accounts.map(a => a.id === editingAccount.id ? { ...a, name: accountName, balance: balanceNum } : a));
       } else if (db && user) {
         await updateDoc(doc(db, 'accounts', editingAccount.id), { name: accountName, balance: balanceNum });
       }
     } else {
-      // Create
       const newAcc = {
         name: accountName,
         balance: balanceNum,
-        type: 'Checking' as const, // default
+        type: 'Checking' as const,
         currency: 'TWD',
         uid: user?.uid
       };
@@ -253,8 +298,6 @@ export default function App() {
     }
   };
 
-  // --- Transaction Management ---
-
   const saveTransaction = async () => {
     if (!transAmount || !transDesc || !transAccountId) {
       alert("請填寫完整資訊");
@@ -265,7 +308,6 @@ export default function App() {
     const account = accounts.find(a => a.id === transAccountId);
     if (!account) return;
 
-    // Calculate new balance
     let newBalance = account.balance;
     if (transType === TransactionType.INCOME) newBalance += amount;
     else newBalance -= amount;
@@ -330,7 +372,6 @@ export default function App() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-background p-4">
         <Card className="w-full max-w-md relative overflow-hidden">
-          {/* Mode Toggle UI */}
           <div className="flex w-full mb-6 bg-slate-100 p-1 rounded-lg">
             <button 
               className={`flex-1 py-2 rounded-md text-sm font-medium transition-all flex items-center justify-center gap-2 ${appMode === 'demo' ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
@@ -466,6 +507,63 @@ export default function App() {
                     <p className="text-slate-500 text-sm">本月支出</p>
                     <h3 className="text-xl font-bold text-slate-800">-${totalExpense.toLocaleString()}</h3>
                   </div>
+                </div>
+              </Card>
+            </div>
+
+            {/* Info Row: Weather & Currency */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Weather Card */}
+              <Card className="flex items-center gap-6 relative overflow-hidden bg-gradient-to-r from-sky-50 to-blue-50 border-blue-100">
+                <div className="absolute -right-4 -top-4 text-blue-100 opacity-50">
+                   <MapPin className="w-32 h-32" />
+                </div>
+                {weather ? (
+                  <>
+                    <div className="z-10 bg-white p-3 rounded-full shadow-sm">
+                      {getWeatherIcon(weather.weatherCode)}
+                    </div>
+                    <div className="z-10">
+                      <div className="flex items-center gap-2 text-slate-500 text-sm mb-1">
+                        <MapPin className="w-3 h-3" /> 目前位置概況
+                      </div>
+                      <h3 className="text-3xl font-bold text-slate-800">{weather.temperature}°C</h3>
+                      <p className="font-medium text-slate-600 flex items-center gap-2">
+                        {getWeatherDesc(weather.weatherCode)}
+                        <span className="text-slate-400 text-sm font-normal flex items-center">
+                          <Wind className="w-3 h-3 mr-1"/> {weather.windSpeed} km/h
+                        </span>
+                      </p>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex items-center gap-3 text-slate-400">
+                    <Loader2 className="animate-spin" />
+                    <span>正在獲取天氣資訊...</span>
+                  </div>
+                )}
+              </Card>
+
+              {/* Currency Card */}
+              <Card className="flex flex-col justify-center bg-gradient-to-r from-emerald-50 to-teal-50 border-emerald-100 relative overflow-hidden">
+                <div className="absolute -right-4 -bottom-4 text-emerald-100 opacity-50">
+                   <Globe className="w-32 h-32" />
+                </div>
+                <div className="flex items-center gap-2 mb-3 z-10">
+                  <RefreshCw className="w-4 h-4 text-emerald-600" />
+                  <span className="text-sm font-bold text-emerald-800">即時匯率 (TWD Base)</span>
+                </div>
+                <div className="grid grid-cols-2 gap-y-2 gap-x-4 z-10">
+                  {rates.length > 0 ? rates.map((r) => (
+                    <div key={r.currency} className="flex justify-between items-center bg-white/60 px-2 py-1 rounded">
+                      <span className="text-sm font-semibold text-slate-600">{r.currency}</span>
+                      <span className="text-sm font-mono font-bold text-slate-800">{r.rate.toFixed(2)}</span>
+                    </div>
+                  )) : (
+                     <div className="col-span-2 text-slate-400 text-sm flex items-center gap-2">
+                        <Loader2 className="w-3 h-3 animate-spin"/> 更新中...
+                     </div>
+                  )}
                 </div>
               </Card>
             </div>

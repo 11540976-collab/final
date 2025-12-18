@@ -37,3 +37,15 @@ export interface FinancialSummary {
   totalExpense: number;
   netSavings: number;
 }
+
+export interface WeatherData {
+  temperature: number;
+  weatherCode: number;
+  isDay: boolean;
+  windSpeed: number;
+}
+
+export interface ExchangeRate {
+  currency: string;
+  rate: number; // Against TWD
+}
