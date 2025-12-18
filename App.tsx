@@ -97,6 +97,7 @@ export default function App() {
   // External API State
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [rates, setRates] = useState<ExchangeRate[]>([]);
+  const [lastRateUpdate, setLastRateUpdate] = useState<Date | null>(null);
   
   // UI State
   const [activeTab, setActiveTab] = useState<'dashboard' | 'accounts' | 'transactions'>('dashboard');
@@ -146,8 +147,9 @@ export default function App() {
   }, [appMode]);
 
   // --- External API Effects ---
+  
+  // 1. Weather Effect (Runs once on mount)
   useEffect(() => {
-    // 1. Get Location & Weather
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         async (position) => {
@@ -157,7 +159,7 @@ export default function App() {
         },
         (error) => {
           console.warn("Geolocation permission denied or error:", error);
-          // Fallback to Taipei if permission denied
+          // Fallback to Taipei
           fetchWeather(25.0330, 121.5654).then(setWeather);
         }
       );
@@ -165,14 +167,21 @@ export default function App() {
        // Fallback to Taipei
        fetchWeather(25.0330, 121.5654).then(setWeather);
     }
+  }, []);
 
-    // 2. Get Exchange Rates
+  // 2. Exchange Rates Effect (Auto-refresh every 60s)
+  useEffect(() => {
     const loadRates = async () => {
       const data = await fetchExchangeRates();
       setRates(data);
+      setLastRateUpdate(new Date());
     };
-    loadRates();
-
+    
+    loadRates(); // Initial fetch
+    
+    const intervalId = setInterval(loadRates, 60000); // Update every minute
+    
+    return () => clearInterval(intervalId);
   }, []);
 
   // --- Data Fetching Effects ---
@@ -552,10 +561,15 @@ export default function App() {
                 <div className="flex items-center gap-2 mb-3 z-10">
                   <RefreshCw className="w-4 h-4 text-emerald-600" />
                   <span className="text-sm font-bold text-emerald-800">即時匯率 (TWD Base)</span>
+                  {lastRateUpdate && (
+                    <span className="text-xs text-emerald-600/70 ml-auto">
+                      {lastRateUpdate.toLocaleTimeString()} 更新
+                    </span>
+                  )}
                 </div>
                 <div className="grid grid-cols-2 gap-y-2 gap-x-4 z-10">
                   {rates.length > 0 ? rates.map((r) => (
-                    <div key={r.currency} className="flex justify-between items-center bg-white/60 px-2 py-1 rounded">
+                    <div key={r.currency} className="flex justify-between items-center bg-white/60 px-2 py-1 rounded hover:bg-white/80 transition-colors cursor-default" title="每60秒自動更新">
                       <span className="text-sm font-semibold text-slate-600">{r.currency}</span>
                       <span className="text-sm font-mono font-bold text-slate-800">{r.rate.toFixed(2)}</span>
                     </div>
