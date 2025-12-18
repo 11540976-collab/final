@@ -14,7 +14,8 @@
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "noFallthroughCasesInSwitch": true
+    "noFallthroughCasesInSwitch": true,
+    "esModuleInterop": true
   },
   "include": ["."],
   "exclude": ["vite.config.ts", "node_modules"],
