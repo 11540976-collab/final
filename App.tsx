@@ -1,11 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { 
-  createUserWithEmailAndPassword, 
-  signInWithEmailAndPassword, 
-  signOut, 
-  onAuthStateChanged
-} from 'firebase/auth';
-import type { User } from 'firebase/auth';
+import firebase from 'firebase/compat/app';
 import { 
   collection, 
   addDoc, 
@@ -66,7 +60,7 @@ export default function App() {
   const [appMode, setAppMode] = useState<'demo' | 'production'>(isFirebaseInitialized ? 'production' : 'demo');
 
   // Auth State
-  const [user, setUser] = useState<User | null>(null); // For Demo mode, we simulate a User object
+  const [user, setUser] = useState<firebase.User | null>(null); // For Demo mode, we simulate a User object
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -123,7 +117,7 @@ export default function App() {
          setIsLoading(false);
          return; 
       }
-      const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      const unsubscribe = auth.onAuthStateChanged((currentUser) => {
         setUser(currentUser);
         setIsLoading(false);
       });
@@ -176,7 +170,7 @@ export default function App() {
     
     if (appMode === 'demo') {
       // Demo Login: Accept anything
-      setUser({ uid: 'demo-user', email: email || 'demo@example.com' } as User);
+      setUser({ uid: 'demo-user', email: email || 'demo@example.com' } as any);
       return;
     }
 
@@ -187,9 +181,9 @@ export default function App() {
 
     try {
       if (authMode === 'login') {
-        await signInWithEmailAndPassword(auth, email, password);
+        await auth.signInWithEmailAndPassword(email, password);
       } else {
-        await createUserWithEmailAndPassword(auth, email, password);
+        await auth.createUserWithEmailAndPassword(email, password);
       }
     } catch (err: any) {
       setAuthError(err.message || "登入失敗");
@@ -201,7 +195,7 @@ export default function App() {
       setUser(null);
       setAiAdvice('');
     } else {
-      if (auth) await signOut(auth);
+      if (auth) await auth.signOut();
     }
   };
 

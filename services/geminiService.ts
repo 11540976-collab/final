@@ -1,6 +1,8 @@
 import { GoogleGenAI } from "@google/genai";
 import { Transaction, BankAccount } from "../types";
 
+declare const process: any;
+
 const apiKey = process.env.API_KEY;
 
 let ai: GoogleGenAI | null = null;

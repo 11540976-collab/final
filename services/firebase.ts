@@ -1,9 +1,9 @@
-import { initializeApp } from "firebase/app";
-import type { FirebaseApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
-import type { Auth } from "firebase/auth";
+import firebase from "firebase/compat/app";
+import "firebase/compat/auth";
 import { getFirestore } from "firebase/firestore";
 import type { Firestore } from "firebase/firestore";
+
+declare const process: any;
 
 // --- 設定說明 ---
 // 若您不希望使用 GitHub Secrets 管理 Firebase 設定，請直接將 Firebase Console 提供的設定物件
@@ -20,8 +20,8 @@ const MANUAL_FIREBASE_CONFIG = {
 
 // ----------------
 
-let app: FirebaseApp | null = null;
-let auth: Auth | null = null;
+let app: firebase.app.App | null = null;
+let auth: firebase.auth.Auth | null = null;
 let db: Firestore | null = null;
 let isFirebaseInitialized = false;
 
@@ -41,8 +41,10 @@ try {
     }
 
     if (configToUse) {
-        app = initializeApp(configToUse);
-        auth = getAuth(app);
+        // Use compat initialization to support auth compatibility
+        app = firebase.initializeApp(configToUse);
+        auth = app.auth();
+        // Use modular firestore with compat app
         db = getFirestore(app);
         isFirebaseInitialized = true;
         console.log("Firebase initialized successfully.");
