@@ -1,6 +1,9 @@
-import { initializeApp, type FirebaseApp } from "firebase/app";
-import { getAuth, type Auth } from "firebase/auth";
-import { getFirestore, type Firestore } from "firebase/firestore";
+import { initializeApp } from "firebase/app";
+import type { FirebaseApp } from "firebase/app";
+import { getAuth } from "firebase/auth";
+import type { Auth } from "firebase/auth";
+import { getFirestore } from "firebase/firestore";
+import type { Firestore } from "firebase/firestore";
 
 // --- 設定說明 ---
 // 若您不希望使用 GitHub Secrets 管理 Firebase 設定，請直接將 Firebase Console 提供的設定物件

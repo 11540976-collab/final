@@ -3,9 +3,9 @@ import {
   createUserWithEmailAndPassword, 
   signInWithEmailAndPassword, 
   signOut, 
-  onAuthStateChanged,
-  type User 
+  onAuthStateChanged
 } from 'firebase/auth';
+import type { User } from 'firebase/auth';
 import { 
   collection, 
   addDoc, 
